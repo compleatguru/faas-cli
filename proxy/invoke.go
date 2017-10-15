@@ -12,13 +12,36 @@ import (
 )
 
 // InvokeFunction a function
-func InvokeFunction(gateway string, name string, bytesIn *[]byte, contentType string) (*[]byte, error) {
+func InvokeFunction(gateway string, name string, bytesIn *[]byte, contentType string, query []string) (*[]byte, error) {
 	var resBytes []byte
 
 	gateway = strings.TrimRight(gateway, "/")
 
 	reader := bytes.NewReader(*bytesIn)
-	res, err := http.Post(gateway+"/function/"+name, contentType, reader)
+	client := http.Client{}
+	qs := ""
+
+	if len(query) > 0 {
+		qs = "?"
+		for _, queryValue := range query {
+			qs = qs + queryValue + "&"
+			if strings.Contains(queryValue, "=") == false {
+				return nil, fmt.Errorf("The --query flags must take the form of key=value (= not found)")
+			}
+			if strings.HasSuffix(queryValue, "=") {
+				return nil, fmt.Errorf("The --query flag must take the form of: key=value (empty value given, or value ends in =)")
+			}
+		}
+		qs = strings.TrimRight(qs, "&")
+	}
+
+	gatewayURL := gateway + "/function/" + name + qs
+	// fmt.Println(gatewayURL)
+	req, _ := http.NewRequest(http.MethodPost, gatewayURL, reader)
+	req.Header.Add("Content-Type", contentType)
+
+	res, err := client.Do(req)
+
 	if err != nil {
 		fmt.Println()
 		fmt.Println(err)
